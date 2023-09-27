@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudFormation Template for an Apache EC2 Instance with Elastic IP
+
+Parameters:
+  SampleNetworkCrossStack:
+    Type: String
+    Default: MySampleNetworkStackName
+    Description: The name of the sample network stack.
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - AMI
+      InstanceType: t2.micro  # Adjust to your desired instance type
+      KeyName: MyKeyPair      # Provide your SSH key pair name
+      SecurityGroupIds:
+        - !GetAtt WebServerSecurityGroup.GroupId
+      SubnetId: !Ref PublicSubnet
+      UserData: !Base64
+        Fn::Sub: |
+          #!/bin/bash -xe
+          # Install and configure Apache web server
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>Hello from your Apache EC2 instance!</h1></body></html>" > /var/www/html/index.html
+
+  ElasticIP:
+    Type: AWS::EC2::EIP
+
+Outputs:
+  PrivateIP:
+    Description: Private IP address of the EC2 instance
+    Value: !GetAtt MyEC2Instance.PrivateIp
+    Export:
+      Name: !Sub '${SampleNetworkCrossStack}-PrivateIP'
+
+  DNSName:
+    Description: DNS name of the Elastic IP
+    Value: !GetAtt ElasticIP.DomainName
+    Export:
+      Name: !Sub '${SampleNetworkCrossStack}-DNSName'
+
+Mappings:
+  RegionMap:
+    us-west-2:
+      AMI: ami-0123456789abcdef0  # Replace with the appropriate AMI for us-west-2
